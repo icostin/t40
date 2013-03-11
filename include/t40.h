@@ -83,6 +83,7 @@ struct t40_obj_s // a hash where keys are identifiers
 struct t40_module_s
 {
   t40_obj_t     obj;
+  t40_ox_t      id_ox;
 };
 
 struct t40_class_s
@@ -92,6 +93,7 @@ struct t40_class_s
   uint_t        method_n;
   t40_ox_t      self_ox;
   t40_ox_t      super_ox;
+  t40_ox_t      id_ox;
   size_t        instance_size;
   t40_action_f  finish;
     /*< finish functions must take into account the fact that some references

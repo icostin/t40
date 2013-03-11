@@ -84,6 +84,7 @@ T40_API uint_t C41_CALL t40_world_create
 {
   uint_t ma_rc, rc;
   t40_flow_t * flow_p;
+  t40_ox_t ox;
 
   C41_VAR_ZERO(*world_p);
 
@@ -177,6 +178,54 @@ T40_API uint_t C41_CALL t40_world_create
 
   world_p->core_module.obj.class_p = &world_p->module_class;
   world_p->core_module.obj.rc = 1;
+
+  ox = T40_ID_FSD(world_p, "topor.v00.core");
+  if (!ox) { LE("failed to create core id"); goto l_error; }
+  world_p->core_module.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "object");
+  if (!ox) { LE("failed to create 'object' id"); goto l_error; }
+  world_p->object_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "class");
+  if (!ox) { LE("failed to create 'class' id"); goto l_error; }
+  world_p->class_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "module");
+  if (!ox) { LE("failed to create 'module' id"); goto l_error; }
+  world_p->module_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "func");
+  if (!ox) { LE("failed to create 'func' id"); goto l_error; }
+  world_p->func_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "null");
+  if (!ox) { LE("failed to create 'null' id"); goto l_error; }
+  world_p->null_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "object");
+  if (!ox) { LE("failed to create 'object' id"); goto l_error; }
+  world_p->object_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "cba");
+  if (!ox) { LE("failed to create 'cba' id"); goto l_error; }
+  world_p->cba_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "ba");
+  if (!ox) { LE("failed to create 'ba' id"); goto l_error; }
+  world_p->ba_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "id");
+  if (!ox) { LE("failed to create 'id' id"); goto l_error; }
+  world_p->id_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "bool");
+  if (!ox) { LE("failed to create 'bool' id"); goto l_error; }
+  world_p->bool_class.id_ox = ox;
+
+  ox = T40_ID_FSD(world_p, "int");
+  if (!ox) { LE("failed to create 'int' id"); goto l_error; }
+  world_p->ref_int_class.id_ox = ox;
 
   return T40_OK;
 
