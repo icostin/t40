@@ -5,6 +5,9 @@
 
 #define INITIAL_OBJECT_COUNT 0x100
 
+#define FIELD_GRAN 1
+#define FIELD_LIM ((1 << 30) - 1)
+
 #if _DEBUG
 #define LL(_level, ...) \
   do { \

@@ -15,6 +15,9 @@
 #define T40_FAILED                              0x01 // generic fail code
 #define T40_NO_CODE                             0x02 // not implemented
 #define T40_MEM_ERROR                           0x03 // check world_p->ma_rc for ma error code
+#define T40_NO_FIELDS                           0x04 // get/set field on object that cannot have fields
+#define T40_FIELD_LIM                           0x05 // reached limit of fields in object
+
 #define T40_BUG_REF                             0xFE // ref-overflow
 #define T40_BUG                                 0xFF
 
@@ -51,6 +54,8 @@ enum t40_ox_enum
 #define T40_NREF_INDEX(_r) ((uint_t) (_r) >> 2)
 #define T40_IREF_VALUE(_r) ((int32_t) (_r) >> 1)
 
+#define T40_IREF_MAKE(_int31) (((int32_t) (_int31) << 1) | 1)
+
 typedef struct t40_ba_s                         t40_ba_t;
 typedef struct t40_class_s                      t40_class_t;
 typedef struct t40_flow_s                       t40_flow_t;
@@ -76,7 +81,7 @@ struct t40_obj_s // a hash where keys are identifiers
 {
   t40_class_t * class_p;
   t40_kvp_t * field_a;
-  uint32_t field_n;
+  uint32_t field_n; // up to 1G fields
   uint32_t rc;
 };
 
@@ -166,6 +171,7 @@ struct t40_world_s
 
   c41_io_t *    log_io_p;
   uint8_t       log_level;
+  uint8_t       is_ending;
 };
 
 struct t40_flow_s
@@ -222,17 +228,24 @@ T40_API t40_ref_t C41_CALL t40_id_fsd
 );
 #define T40_ID_FSD(_w, _sl) (t40_id_fsd((_w), (uint8_t const *) (_sl), sizeof(_sl) - 1))
 
+/* t40_ref ******************************************************************/
 T40_API uint_t C41_CALL t40_ref
 (
   t40_world_t * world_p,
   t40_ref_t obj_r
 );
 
+/* t40_deref ****************************************************************/
 T40_API uint_t C41_CALL t40_deref
 (
   t40_world_t * world_p,
   t40_ref_t obj_r
 );
+
+/* t40_set_field ************************************************************/
+T40_API uint_t C41_CALL t40_set_field (t40_world_t * world_p, t40_ref_t obj_r, 
+                                       t40_ref_t field_id_r, t40_ref_t value_r);
+
 
 #endif /* _T40_H_ */
 

@@ -168,7 +168,7 @@ T40_API uint_t C41_CALL t40_world_create
   if (rc) goto l_error;
 
   world_p->null_obj.class_p = &world_p->null_class;
-  world_p->null_obj.rc = 1;
+  world_p->null_obj.rc = (1 << 31);
 
   world_p->false_obj.class_p = &world_p->bool_class;
   world_p->false_obj.rc = 1;
@@ -179,53 +179,61 @@ T40_API uint_t C41_CALL t40_world_create
   world_p->core_module.obj.class_p = &world_p->module_class;
   world_p->core_module.obj.rc = 1;
 
-  ox = T40_ID_FSD(world_p, "topor.v00.core");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "topor.v00.core"));
   if (!ox) { LE("failed to create core id"); goto l_error; }
   world_p->core_module.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "object");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "object"));
   if (!ox) { LE("failed to create 'object' id"); goto l_error; }
   world_p->object_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "class");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "class"));
   if (!ox) { LE("failed to create 'class' id"); goto l_error; }
   world_p->class_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "module");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "module"));
   if (!ox) { LE("failed to create 'module' id"); goto l_error; }
   world_p->module_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "func");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "func"));
   if (!ox) { LE("failed to create 'func' id"); goto l_error; }
   world_p->func_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "null");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "null"));
   if (!ox) { LE("failed to create 'null' id"); goto l_error; }
   world_p->null_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "object");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "object"));
   if (!ox) { LE("failed to create 'object' id"); goto l_error; }
   world_p->object_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "cba");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "cba"));
   if (!ox) { LE("failed to create 'cba' id"); goto l_error; }
   world_p->cba_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "ba");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "ba"));
   if (!ox) { LE("failed to create 'ba' id"); goto l_error; }
   world_p->ba_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "id");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "id"));
   if (!ox) { LE("failed to create 'id' id"); goto l_error; }
   world_p->id_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "bool");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "bool"));
   if (!ox) { LE("failed to create 'bool' id"); goto l_error; }
   world_p->bool_class.id_ox = ox;
 
-  ox = T40_ID_FSD(world_p, "int");
+  ox = T40_NREF_INDEX(T40_ID_FSD(world_p, "int"));
   if (!ox) { LE("failed to create 'int' id"); goto l_error; }
   world_p->ref_int_class.id_ox = ox;
+
+  rc = t40_set_field(world_p, OX_TO_REF(T40_OX_CORE),
+                     OX_TO_REF(world_p->object_class.id_ox), OX_TO_REF(T40_OX_OBJECT_CLASS));
+  if (rc) { LE("ouch"); goto l_error; }
+
+  rc = t40_set_field(world_p, OX_TO_REF(T40_OX_CORE),
+                     OX_TO_REF(world_p->class_class.id_ox), OX_TO_REF(T40_OX_CLASS_CLASS));
+  if (rc) { LE("ouch"); goto l_error; }
 
   return T40_OK;
 
@@ -245,6 +253,7 @@ T40_API uint_t C41_CALL t40_world_finish (t40_world_t * world_p)
   t40_flow_t * flow_p;
 
   LI("finishing...");
+  world_p->is_ending = 1;
   for (np_p = world_p->flow_list.next; np_p != &world_p->flow_list;)
   {
     flow_p = T40_FLOW_FROM_LINKS(np_p);
@@ -265,17 +274,33 @@ T40_API uint_t C41_CALL t40_world_finish (t40_world_t * world_p)
       nf_ox = world_p->obj.nf_oxa[ox];
       world_p->obj.pa[ox] = NULL;
     }
-    /* clear ref counts for all objects */
-    for (ox = T40_OX__COUNT; ox < world_p->uninit_ox; ++ox)
-      if (world_p->obj.pa[ox]) 
+    /* delete fields & clear ref counts for all objects */
+    for (ox = 0; ox < world_p->uninit_ox; ++ox)
+    {
+      t40_obj_t * obj_p = world_p->obj.pa[ox];
+      if (!obj_p) continue;
+      if (obj_p->field_n)
       {
-        LI("clearing ref counter for ox=$Xd (rc=$Xd)", 
-           ox, world_p->obj.pa[ox]->rc);
-        world_p->obj.pa[ox]->rc = 0;
+        uint_t i;
+        LI("clearing fields: ox=$Xd, fn=$Xd", ox, obj_p->field_n);
+        for (i = 0; i < obj_p->field_n; ++i)
+        {
+          c = t40_deref(world_p, obj_p->field_a[i].key);
+          if (c) { LE("ouch"); return c; }
+          c = t40_deref(world_p, obj_p->field_a[i].value);
+          if (c) { LE("ouch"); return c; }
+        }
+        c = C41_VAR_FREE(&world_p->ma, obj_p->field_a, obj_p->field_n);
+        if (c) { LE("ouch"); world_p->ma_rc = c; return T40_MEM_ERROR; }
       }
 
+      LI("clearing ref counter for ox=$Xd (rc=$Xd)",
+           ox, world_p->obj.pa[ox]->rc);
+      world_p->obj.pa[ox]->rc = 0;
+    }
+
     /* compute finish dependencies between objects */
-    for (ox = T40_OX__COUNT; ox < world_p->uninit_ox; ++ox)
+    for (ox = 0; ox < world_p->uninit_ox; ++ox)
     {
       t40_obj_t * obj_p;
       t40_class_t * class_p;
@@ -296,7 +321,7 @@ T40_API uint_t C41_CALL t40_world_finish (t40_world_t * world_p)
     /* now start destroying objects with no dependencies, which
      * should trigger eventually the destruction of those with dependencies
      * when the references to them are removed */
-    for (ox = T40_OX__COUNT; ox < world_p->uninit_ox; ++ox)
+    for (ox = 0; ox < world_p->uninit_ox; ++ox)
     {
       t40_obj_t * obj_p;
       t40_class_t * class_p;
@@ -307,16 +332,19 @@ T40_API uint_t C41_CALL t40_world_finish (t40_world_t * world_p)
       c = class_p->finish(world_p, obj_p);
       if (c)
       {
-        LE("failed finalising object $Xd ($s = $Xi)", 
+        LE("failed finalising object $Xd ($s = $Xi)",
            ox, t40_status_name(c), c);
         return world_p->finish_rc = T40_FAILED;
       }
       LI("freeing memory: ox=$Xd, size=$Xz", ox, class_p->instance_size);
-      c = c41_ma_free(&world_p->ma, obj_p, class_p->instance_size);
-      if (c)
+      if (ox >= T40_OX__COUNT)
       {
-        world_p->ma_rc = c;
-        return world_p->finish_rc = T40_MEM_ERROR;
+        c = c41_ma_free(&world_p->ma, obj_p, class_p->instance_size);
+        if (c)
+        {
+          world_p->ma_rc = c;
+          return world_p->finish_rc = T40_MEM_ERROR;
+        }
       }
     }
 
@@ -368,6 +396,7 @@ l_bug:
 /* ox_free ******************************************************************/
 C41_LOCAL void C41_CALL ox_free (t40_world_t * world_p, t40_ox_t ox)
 {
+  if (world_p->is_ending) return;
   world_p->obj.nf_oxa[ox] = world_p->ff_ox;
   world_p->ff_ox = ox;
   LI("ff_ox=$d, uninit_ox=$d, lim_ox=$d",
@@ -587,5 +616,67 @@ T40_API uint_t C41_CALL t40_deref
 {
   if (!T40_IS_NREF(obj_r)) return 0;
   return ox_deref(world_p, T40_NREF_INDEX(obj_r));
+}
+
+/* t40_set_field ************************************************************/
+T40_API uint_t C41_CALL t40_set_field (t40_world_t * world_p, t40_ref_t obj_r,
+                                       t40_ref_t field_id_r, t40_ref_t value_r)
+{
+  t40_ox_t ox;
+  t40_obj_t * obj_p;
+  int32_t a, b, c;
+  t40_ref_t key_r;
+  uint_t rc;
+
+  if (!T40_IS_NREF(obj_r)) return T40_NO_FIELDS;
+
+  ox = T40_NREF_INDEX(obj_r);
+  A(ox < world_p->uninit_ox);
+  obj_p = world_p->obj.pa[ox];
+
+  for (a = 0, b = obj_p->field_n - 1; a <= b; )
+  {
+    c = (a + b) >> 1;
+    key_r = obj_p->field_a[c].key;
+    if (key_r == field_id_r)
+    {
+      // replace old value with the new one
+      rc = t40_deref(world_p, obj_p->field_a[c].value);
+      if (rc) return rc;
+      rc = t40_ref(world_p, value_r);
+      if (rc) return rc;
+      obj_p->field_a[c].value = value_r;
+      return 0;
+    }
+    if (field_id_r < key_r) b = c - 1;
+    else a = c + 1;
+  }
+  if (obj_p->field_n == FIELD_LIM) return T40_FIELD_LIM;
+
+  if ((obj_p->field_n & (FIELD_GRAN - 1)) == 0)
+  {
+    LI("realloc field table for ox=$Xd to n=$Xd", ox, obj_p->field_n + FIELD_GRAN);
+    rc = C41_VAR_REALLOC(&world_p->ma, obj_p->field_a,
+                         obj_p->field_n + FIELD_GRAN, obj_p->field_n);
+    if (rc)
+    {
+      world_p->ma_rc = rc;
+      return T40_MEM_ERROR;
+    }
+  }
+  for (c = obj_p->field_n; c > a; --c)
+    obj_p->field_a[c] = obj_p->field_a[c - 1];
+
+  rc = t40_ref(world_p, field_id_r);
+  if (rc) return rc;
+  rc = t40_ref(world_p, value_r);
+  if (rc) return rc;
+  obj_p->field_a[a].key = field_id_r;
+  obj_p->field_a[a].value = value_r;
+  obj_p->field_n += 1;
+  return 0;
+  goto l_bug;
+l_bug:
+  return T40_BUG;
 }
 
